@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #245C45;
+  --color-primary-dark: #1B4534;
+  --color-primary-light: #2E7356;
+  --color-secondary: #6FAF78;
+  --color-secondary-light: #EBF5ED;
+  --color-secondary-dark: #589461;
+  --color-bg-warm: #F8F8F2;
+  --color-accent: #F4A261;
+  --color-accent-hover: #E76F51;
+  --color-charcoal: #25312B;
+  --color-charcoal-muted: #53645B;
+  --color-charcoal-light: #8E9F96;
+}
+
+:root {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  color: #25312B;
+  background-color: #F8F8F2;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: #F8F8F2;
+  color: #25312B;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1eb;
+}
+::-webkit-scrollbar-thumb {
+  background: #c3cfc8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8E9F96;
+}
+
+/* Leaflet map styles */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+  z-index: 10;
+}

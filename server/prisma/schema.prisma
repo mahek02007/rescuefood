@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String             @id @default(uuid())
+  name               String
+  email              String             @unique
+  passwordHash       String
+  phone              String             @default("+1 (555) 000-0000")
+  role               String             @default("donor") // donor, ngo, volunteer, admin
+  organization       String?
+  address            String             @default("100 Metro Avenue, Suite 200")
+  city               String             @default("Metropolis")
+  area               String             @default("Downtown")
+  pincode            String             @default("94103")
+  latitude           Float              @default(37.7749)
+  longitude          Float              @default(-122.4194)
+  avatar             String             @default("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=250")
+  isVerified         Boolean            @default(false)
+  verificationStatus String             @default("pending") // verified, pending, rejected
+  verificationDoc    String?
+  joinedDate         DateTime           @default(now())
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  // Stats
+  totalMealsRescued  Int                @default(0)
+  totalDonations     Int                @default(0)
+  totalDeliveries    Int                @default(0)
+
+  // Relations
+  donationsCreated     Donation[]            @relation("DonorDonations")
+  donationsClaimed     Donation[]            @relation("NgoClaimedDonations")
+  donationsDelivered   Donation[]            @relation("VolunteerDonations")
+  notifications        Notification[]
+  verificationRequests VerificationRequest[]
+  reportedIssues       ReportedIssue[]
+}
+
+model Donation {
+  id                    String    @id @default(uuid())
+  title                 String
+  category              String    // 'Cooked Meals', 'Fresh Fruits', etc.
+  description           String
+  foodType              String    // 'Vegetarian', 'Non-Vegetarian', etc.
+  quantityValue         Float
+  quantityUnit          String    // 'meals', 'kg', 'packets', 'boxes'
+  estimatedPeopleServed Int       @default(10)
+  imageUrl              String?
+  preparedDateTime      DateTime?
+  expiryDateTime        DateTime
+  storageCondition      String    @default("Room Temperature")
+  packagingStatus       String    @default("Bulk Containers")
+  pickupDate            String
+  pickupTimeWindow      String
+  
+  // Location
+  pickupAddress         String
+  city                  String    @default("Metropolis")
+  area                  String    @default("Downtown")
+  pincode               String    @default("94103")
+  latitude              Float     @default(37.7749)
+  longitude             Float     @default(-122.4194)
+  
+  // Contact
+  contactPerson         String
+  contactPhone          String
+  specialInstructions   String?
+  foodSafetyConfirmed   Boolean   @default(true)
+  
+  // Status & Timestamps
+  status                String    @default("Available") // Available, Claimed, Pickup Scheduled, Picked Up, Completed, Cancelled
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Donor
+  donorId               String
+  donor                 User      @relation("DonorDonations", fields: [donorId], references: [id], onDelete: Cascade)
+  donorName             String
+  donorOrg              String?
+  donorVerified         Boolean   @default(true)
+  donorAvatar           String?
+
+  // Claimed NGO
+  claimedByNgoId        String?
+  claimedByNgo          User?     @relation("NgoClaimedDonations", fields: [claimedByNgoId], references: [id])
+  claimedByNgoName      String?
+  claimedAt             DateTime?
+  ngoRequiredQuantity   Float?
+  ngoPeopleToServe      Int?
+  ngoPickupNotes        String?
+
+  // Volunteer
+  assignedVolunteerId   String?
+  assignedVolunteer     User?     @relation("VolunteerDonations", fields: [assignedVolunteerId], references: [id])
+  assignedVolunteerName String?
+  volunteerPhone        String?
+  acceptedAt            DateTime?
+  pickedUpAt            DateTime?
+  deliveredAt           DateTime?
+  deliveryProofPhoto    String?
+  receiverName          String?
+  deliveryNotes         String?
+
+  // Cancellation
+  cancellationReason    String?
+  cancelledAt           DateTime?
+  cancelledBy           String?
+
+  // Relations
+  timelines             ActivityTimeline[]
+  notifications         Notification[]
+}
+
+model ActivityTimeline {
+  id          String   @id @default(uuid())
+  donationId  String
+  donation    Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  status      String
+  description String
+  actorName   String
+  actorRole   String
+  timestamp   DateTime @default(now())
+}
+
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       String?   // 'all' or role string
+  title      String
+  message    String
+  type       String    // donation, claim, pickup, delivery, cancellation, verification, system
+  read       Boolean   @default(false)
+  link       String?
+  donationId String?
+  donation   Donation? @relation(fields: [donationId], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
+}
+
+model VerificationRequest {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationName String
+  documentUrl      String?
+  status           String    @default("pending") // pending, verified, rejected
+  submittedAt      DateTime  @default(now())
+  reviewedAt       DateTime?
+  notes            String?
+}
+
+model ReportedIssue {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  donationId  String?
+  issueType   String
+  description String
+  status      String   @default("open") // open, resolved, dismissed
+  createdAt   DateTime @default(now())
+}
