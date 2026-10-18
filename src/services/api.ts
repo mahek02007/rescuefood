@@ -14,6 +14,8 @@ export const setStoredToken = (token: string | null) => {
   }
 };
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+
 async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -29,7 +31,9 @@ async function apiFetch<T>(
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(endpoint, {
+    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+
+    const res = await fetch(url, {
       ...options,
       headers,
     });

@@ -16,7 +16,19 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 // Middleware
 app.use(
   cors({
-    origin: CORS_ORIGIN === '*' ? true : [CORS_ORIGIN, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (
+        CORS_ORIGIN === '*' ||
+        origin === CORS_ORIGIN ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
     credentials: true,
   })
 );
@@ -55,20 +67,22 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   });
 });
 
-// Start Server
-app.listen(PORT, async () => {
-  console.log(`\n======================================================`);
-  console.log(`🚀 FoodRescue Backend API running on http://localhost:${PORT}`);
-  console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`======================================================\n`);
+// Start Server (only when not running on Vercel Serverless Functions)
+if (!process.env.VERCEL) {
+  app.listen(PORT, async () => {
+    console.log(`\n======================================================`);
+    console.log(`🚀 FoodRescue Backend API running on http://localhost:${PORT}`);
+    console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`======================================================\n`);
 
-  const dbStatus = await checkDatabaseConnection();
-  if (dbStatus.connected) {
-    console.log(`✅ [Database] PostgreSQL connected successfully via Prisma.`);
-  } else {
-    console.warn(`⚠️ [Database] Notice: ${dbStatus.message}`);
-    console.warn(`👉 Configure your PostgreSQL connection string in 'server/.env' under DATABASE_URL.`);
-  }
-});
+    const dbStatus = await checkDatabaseConnection();
+    if (dbStatus.connected) {
+      console.log(`✅ [Database] PostgreSQL connected successfully via Prisma.`);
+    } else {
+      console.warn(`⚠️ [Database] Notice: ${dbStatus.message}`);
+      console.warn(`👉 Configure your PostgreSQL connection string in 'server/.env' under DATABASE_URL.`);
+    }
+  });
+}
 
 export default app;
