@@ -4,20 +4,12 @@ import { useData } from '../context/DataContext';
 import { useNavigate } from 'react-router-dom';
 import {
   User,
-  Mail,
-  Phone,
-  Building,
   MapPin,
   ShieldCheck,
   Bell,
   Lock,
   LogOut,
-  CheckCircle2,
   Save,
-  Utensils,
-  Truck,
-  HeartHandshake,
-  Award,
   Sparkles,
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';

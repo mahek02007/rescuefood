@@ -10,13 +10,9 @@ import {
   Clock,
   ShieldCheck,
   Truck,
-  Users,
   AlertTriangle,
-  ExternalLink,
-  Phone,
   CheckCircle2,
   Calendar,
-  Utensils,
   ChevronRight,
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
