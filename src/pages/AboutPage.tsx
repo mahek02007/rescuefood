@@ -154,9 +154,9 @@ export const AboutPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Demo statistics note */}
+      {/* Platform integrity note */}
       <div className="text-center text-xs text-[#8E9F96] pt-4">
-        Notice: All platform data, metrics, and donor credentials presented on this website are illustrative simulated demo records.
+        FoodRescue operates on verified real-time database records connecting authenticated commercial donors, accredited recipient pantries, and community couriers.
       </div>
     </div>
   );

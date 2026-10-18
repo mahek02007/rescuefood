@@ -24,8 +24,28 @@ import { useToast } from '../context/ToastContext';
 
 export const ProfilePage: React.FC = () => {
   const { currentUser, updateProfile, logout } = useAuth();
+  const { donations, impactMetrics } = useData();
   const { showToast } = useToast();
   const navigate = useNavigate();
+
+  // Dynamic user calculations from real database records
+  const donorListings = donations.filter((d) => d.donorId === currentUser?.id);
+  const donorCompleted = donorListings.filter((d) => d.status === 'Completed');
+  const donorMeals = donorCompleted.reduce((acc, d) => acc + (d.estimatedPeopleServed || d.quantityValue || 0), 0);
+
+  const ngoClaimed = donations.filter((d) => d.claimedByNgoId === currentUser?.id);
+  const ngoCompleted = ngoClaimed.filter((d) => d.status === 'Completed');
+  const ngoMeals = ngoCompleted.reduce((acc, d) => acc + (d.estimatedPeopleServed || d.quantityValue || 0), 0);
+
+  const volCompleted = donations.filter((d) => d.assignedVolunteerId === currentUser?.id && d.status === 'Completed');
+  const volMeals = volCompleted.reduce((acc, d) => acc + (d.estimatedPeopleServed || d.quantityValue || 0), 0);
+  const volHours = volCompleted.reduce((acc, d) => {
+    if (d.deliveredAt && (d.pickedUpAt || d.acceptedAt)) {
+      const h = (new Date(d.deliveredAt).getTime() - new Date(d.pickedUpAt || d.acceptedAt!).getTime()) / 3600000;
+      return acc + (h > 0 ? h : 0);
+    }
+    return acc;
+  }, 0);
 
   // Form states
   const [name, setName] = useState(currentUser?.name || '');
@@ -149,19 +169,23 @@ export const ProfilePage: React.FC = () => {
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
               <span className="text-[10px] text-white/70 uppercase font-bold">Meals Rescued</span>
               <h4 className="text-2xl font-black text-[#F4A261] mt-1 font-heading">
-                {(currentUser.totalMealsRescued || 4850).toLocaleString()}
+                {donorMeals.toLocaleString()}
               </h4>
-              <p className="text-[11px] text-white/80 mt-1">Diverted from corporate buffet waste</p>
+              <p className="text-[11px] text-white/80 mt-1">From verified completed drop-offs</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
               <span className="text-[10px] text-white/70 uppercase font-bold">Listings Posted</span>
-              <h4 className="text-2xl font-black text-white mt-1 font-heading">42 batches</h4>
-              <p className="text-[11px] text-white/80 mt-1">100% matched with local pantries</p>
+              <h4 className="text-2xl font-black text-white mt-1 font-heading">
+                {donorListings.length} {donorListings.length === 1 ? 'batch' : 'batches'}
+              </h4>
+              <p className="text-[11px] text-white/80 mt-1">{donorCompleted.length} completed collections</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
               <span className="text-[10px] text-white/70 uppercase font-bold">Greenhouse Gases Saved</span>
-              <h4 className="text-2xl font-black text-[#6FAF78] mt-1 font-heading">8,970 kg CO₂e</h4>
-              <p className="text-[11px] text-white/80 mt-1">Equivalent to 21,500 car miles</p>
+              <h4 className="text-2xl font-black text-[#6FAF78] mt-1 font-heading">
+                {Math.round(donorMeals * 2.5).toLocaleString()} kg CO₂e
+              </h4>
+              <p className="text-[11px] text-white/80 mt-1">Diverted from methane decomposition</p>
             </div>
           </div>
         )}
@@ -171,19 +195,23 @@ export const ProfilePage: React.FC = () => {
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
               <span className="text-[10px] text-white/70 uppercase font-bold">Servings Distributed</span>
               <h4 className="text-2xl font-black text-[#F4A261] mt-1 font-heading">
-                {(currentUser.totalMealsRescued || 12400).toLocaleString()}
+                {ngoMeals.toLocaleString()}
               </h4>
-              <p className="text-[11px] text-white/80 mt-1">Delivered to local families</p>
+              <p className="text-[11px] text-white/80 mt-1">Delivered to local community</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
               <span className="text-[10px] text-white/70 uppercase font-bold">Donations Claimed</span>
-              <h4 className="text-2xl font-black text-white mt-1 font-heading">86 listings</h4>
-              <p className="text-[11px] text-white/80 mt-1">From 18 corporate culinary partners</p>
+              <h4 className="text-2xl font-black text-white mt-1 font-heading">
+                {ngoClaimed.length} {ngoClaimed.length === 1 ? 'listing' : 'listings'}
+              </h4>
+              <p className="text-[11px] text-white/80 mt-1">{ngoCompleted.length} fulfilled dispatches</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
-              <span className="text-[10px] text-white/70 uppercase font-bold">Budget Saved</span>
-              <h4 className="text-2xl font-black text-[#6FAF78] mt-1 font-heading">$43,400</h4>
-              <p className="text-[11px] text-white/80 mt-1">Reinvested into shelter care programs</p>
+              <span className="text-[10px] text-white/70 uppercase font-bold">Estimated Meal Value Saved</span>
+              <h4 className="text-2xl font-black text-[#6FAF78] mt-1 font-heading">
+                ${(ngoMeals * 3.5).toLocaleString()}
+              </h4>
+              <p className="text-[11px] text-white/80 mt-1">Nutritious provisions redirected</p>
             </div>
           </div>
         )}
@@ -193,21 +221,23 @@ export const ProfilePage: React.FC = () => {
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
               <span className="text-[10px] text-white/70 uppercase font-bold">Courier Deliveries</span>
               <h4 className="text-2xl font-black text-[#F4A261] mt-1 font-heading">
-                {(currentUser.totalDeliveries || 38)} trips
+                {volCompleted.length} {volCompleted.length === 1 ? 'trip' : 'trips'}
               </h4>
-              <p className="text-[11px] text-white/80 mt-1">Safe food parcels dispatched</p>
+              <p className="text-[11px] text-white/80 mt-1">Completed courier runs</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
               <span className="text-[10px] text-white/70 uppercase font-bold">Meals Transported</span>
               <h4 className="text-2xl font-black text-white mt-1 font-heading">
-                {(currentUser.totalMealsRescued || 3920).toLocaleString()}
+                {volMeals.toLocaleString()}
               </h4>
-              <p className="text-[11px] text-white/80 mt-1">Zero-spill verification</p>
+              <p className="text-[11px] text-white/80 mt-1">Delivered directly to pantries</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
-              <span className="text-[10px] text-white/70 uppercase font-bold">Volunteer Badges</span>
-              <h4 className="text-2xl font-black text-[#6FAF78] mt-1 font-heading">5 Master Badges</h4>
-              <p className="text-[11px] text-white/80 mt-1">Urban Micro-Mobility Hero</p>
+              <span className="text-[10px] text-white/70 uppercase font-bold">Transport Duration</span>
+              <h4 className="text-2xl font-black text-[#6FAF78] mt-1 font-heading">
+                {volHours.toFixed(1)} hrs
+              </h4>
+              <p className="text-[11px] text-white/80 mt-1">Recorded transit time</p>
             </div>
           </div>
         )}
@@ -216,18 +246,22 @@ export const ProfilePage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
               <span className="text-[10px] text-white/70 uppercase font-bold">Platform Status</span>
-              <h4 className="text-2xl font-black text-[#6FAF78] mt-1 font-heading">Healthy</h4>
-              <p className="text-[11px] text-white/80 mt-1">All dispatcher queues operational</p>
+              <h4 className="text-2xl font-black text-[#6FAF78] mt-1 font-heading">Operational</h4>
+              <p className="text-[11px] text-white/80 mt-1">All pipelines active</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
-              <span className="text-[10px] text-white/70 uppercase font-bold">Active Radius</span>
-              <h4 className="text-2xl font-black text-[#F4A261] mt-1 font-heading">50 km Regional</h4>
-              <p className="text-[11px] text-white/80 mt-1">5 metro sector zones</p>
+              <span className="text-[10px] text-white/70 uppercase font-bold">Platform Listings</span>
+              <h4 className="text-2xl font-black text-[#F4A261] mt-1 font-heading">
+                {donations.length} total
+              </h4>
+              <p className="text-[11px] text-white/80 mt-1">In real-time database</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
-              <span className="text-[10px] text-white/70 uppercase font-bold">Compliance Level</span>
-              <h4 className="text-2xl font-black text-white mt-1 font-heading">100% Audit</h4>
-              <p className="text-[11px] text-white/80 mt-1">Good Samaritan statutory standards</p>
+              <span className="text-[10px] text-white/70 uppercase font-bold">Total Meals Diverted</span>
+              <h4 className="text-2xl font-black text-white mt-1 font-heading">
+                {impactMetrics.totalMealsRescued.toLocaleString()}
+              </h4>
+              <p className="text-[11px] text-white/80 mt-1">Across all verified donors</p>
             </div>
           </div>
         )}

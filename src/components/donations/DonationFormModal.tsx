@@ -68,20 +68,18 @@ export const DonationFormModal: React.FC<DonationFormModalProps> = ({
 
   // Location fields
   const [pickupAddress, setPickupAddress] = useState(
-    currentUser?.address || '742 Evergreen Terrace, Banquet Loading Bay'
+    currentUser?.address || ''
   );
   const [city, setCity] = useState(currentUser?.city || 'Metropolis');
-  const [area, setArea] = useState(currentUser?.area || 'Downtown Hub');
+  const [area, setArea] = useState(currentUser?.area || 'Downtown');
   const [pincode, setPincode] = useState(currentUser?.pincode || '94103');
   const [latitude, setLatitude] = useState(currentUser?.latitude || 37.7758);
   const [longitude, setLongitude] = useState(currentUser?.longitude || -122.4178);
 
   // Contact
-  const [contactPerson, setContactPerson] = useState(currentUser?.name || 'Chef Marcus Vance');
-  const [contactPhone, setContactPhone] = useState(currentUser?.phone || '+1 (555) 234-5678');
-  const [specialInstructions, setSpecialInstructions] = useState(
-    'Ring kitchen service bay bell; crates can be wheeled directly to vehicle.'
-  );
+  const [contactPerson, setContactPerson] = useState(currentUser?.name || '');
+  const [contactPhone, setContactPhone] = useState(currentUser?.phone || '');
+  const [specialInstructions, setSpecialInstructions] = useState('');
 
   // Food Safety Checklist (all 4 required)
   const [checklist, setChecklist] = useState({
@@ -152,7 +150,12 @@ export const DonationFormModal: React.FC<DonationFormModalProps> = ({
     }
   };
 
-  const handleFinalSubmit = () => {
+  const handleFinalSubmit = async () => {
+    if (!currentUser) {
+      showToast('Authentication Required', 'Please sign in to post a surplus donation.', 'error');
+      return;
+    }
+
     const newDonationData: Omit<Donation, 'id' | 'status' | 'createdAt'> = {
       title,
       category,
@@ -174,20 +177,24 @@ export const DonationFormModal: React.FC<DonationFormModalProps> = ({
       pincode,
       latitude,
       longitude,
-      contactPerson,
-      contactPhone,
+      contactPerson: contactPerson || currentUser.name,
+      contactPhone: contactPhone || currentUser.phone,
       specialInstructions,
       foodSafetyConfirmed: true,
-      donorId: currentUser?.id || 'demo-donor',
-      donorName: currentUser?.name || 'Chef Marcus Vance',
-      donorOrg: currentUser?.organization || 'Grand Regal Hotel',
-      donorVerified: currentUser?.isVerified ?? true,
-      donorAvatar: currentUser?.avatar,
+      donorId: currentUser.id,
+      donorName: currentUser.name,
+      donorOrg: currentUser.organization || undefined,
+      donorVerified: currentUser.isVerified,
+      donorAvatar: currentUser.avatar,
     };
 
-    const newId = createDonation(newDonationData);
-    if (onSuccess) onSuccess(newId);
-    onClose();
+    try {
+      const newId = await createDonation(newDonationData);
+      if (onSuccess) onSuccess(newId);
+      onClose();
+    } catch {
+      // error toast handled in createDonation
+    }
   };
 
   return (

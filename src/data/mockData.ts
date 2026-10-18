@@ -24,7 +24,7 @@ export const DEMO_USERS: Record<string, User> = {
   },
   ngo: {
     id: 'user-ngo-1',
-    name: 'Sarah Jenkins',
+    name: 'Elena Vance',
     email: 'sarah@hopehearth.org',
     phone: '+1 (555) 876-5432',
     role: 'ngo',
@@ -429,16 +429,16 @@ export const INITIAL_REPORTED_ISSUES = [
 
 export const TESTIMONIALS = [
   {
-    quote: "FoodRescue transformed our banquet operations. Instead of discarding hundreds of untouched catered servings, we can connect with Hope Hearth Kitchen within 15 minutes. It feels incredible to see our food bring genuine comfort.",
+    quote: "FoodRescue transformed our banquet operations. Instead of discarding hundreds of untouched catered servings, we can connect with community distribution kitchens within 15 minutes. It feels incredible to see our food bring genuine comfort.",
     author: "Chef Marcus Vance",
     role: "Executive Banquet Chef, Grand Regal Hotel",
     avatar: "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&q=80&w=200",
     badge: "Verified Donor"
   },
   {
-    quote: "Our shelter serves 250 warm meals daily on a shoe-string budget. FoodRescue's real-time radius matching guarantees that wholesome, chef-prepared nutrition reaches families before it expires.",
-    author: "Sarah Jenkins",
-    role: "Director, Hope Hearth Community Kitchen",
+    quote: "Our shelter serves warm meals daily on a community budget. FoodRescue's real-time radius matching guarantees that wholesome, chef-prepared nutrition reaches families before it expires.",
+    author: "Maria Santos",
+    role: "Director, Community Table Network",
     avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200",
     badge: "Partner NGO"
   },

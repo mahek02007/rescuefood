@@ -153,25 +153,25 @@ export const AuthPage: React.FC = () => {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 flex flex-col justify-end">
               <p className="text-xs font-bold text-white leading-tight">
-                "Over 18,400 meals rescued across Metropolis this month."
+                "Directly routing commercial food surplus to community kitchens."
               </p>
-              <span className="text-[10px] text-white/70 mt-0.5">Real-time localized surplus routing</span>
+              <span className="text-[10px] text-white/70 mt-0.5">Real-time verified localized redistribution</span>
             </div>
           </div>
 
-          {/* Impact Stats */}
+          {/* Mission Features */}
           <div className="relative z-10 grid grid-cols-3 gap-2 pt-4 border-t border-white/15 text-center">
             <div>
-              <div className="text-lg sm:text-xl font-black text-[#F4A261] font-heading">18.4K+</div>
-              <div className="text-[10px] text-white/70 uppercase font-semibold">Meals Rescued</div>
+              <div className="text-lg sm:text-xl font-black text-[#F4A261] font-heading">100%</div>
+              <div className="text-[10px] text-white/70 uppercase font-semibold">Direct Rescue</div>
             </div>
             <div>
-              <div className="text-lg sm:text-xl font-black text-white font-heading">38+</div>
-              <div className="text-[10px] text-white/70 uppercase font-semibold">Donors</div>
+              <div className="text-lg sm:text-xl font-black text-white font-heading">Verified</div>
+              <div className="text-[10px] text-white/70 uppercase font-semibold">Charities</div>
             </div>
             <div>
-              <div className="text-lg sm:text-xl font-black text-[#6FAF78] font-heading">28</div>
-              <div className="text-[10px] text-white/70 uppercase font-semibold">Verified NGOs</div>
+              <div className="text-lg sm:text-xl font-black text-[#6FAF78] font-heading">Live</div>
+              <div className="text-[10px] text-white/70 uppercase font-semibold">GPS Routing</div>
             </div>
           </div>
         </div>

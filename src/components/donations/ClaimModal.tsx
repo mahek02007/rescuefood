@@ -39,16 +39,21 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
 
   if (!isOpen || !donation) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreedTerms) {
       showToast('Agreement Required', 'Please confirm you will distribute food at no cost.', 'warning');
       return;
     }
 
-    const success = claimDonation(donation.id, {
-      id: currentUser?.id || 'ngo-demo',
-      name: currentUser?.organization || currentUser?.name || 'Hope Hearth Community Kitchen',
+    if (!currentUser) {
+      showToast('Authentication Required', 'Please sign in to claim food surplus.', 'warning');
+      return;
+    }
+
+    const success = await claimDonation(donation.id, {
+      id: currentUser.id,
+      name: currentUser.organization || currentUser.name,
       quantity,
       peopleToServe,
       notes: pickupNotes,

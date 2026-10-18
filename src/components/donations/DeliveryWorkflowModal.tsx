@@ -31,12 +31,18 @@ export const DeliveryWorkflowModal: React.FC<DeliveryWorkflowModalProps> = ({
   const { acceptVolunteerTask, updateDeliveryStatus } = useData();
   const { showToast } = useToast();
 
-  const [receiverName, setReceiverName] = useState('Sarah Jenkins (Hope Hearth Kitchen)');
-  const [deliveryNotes, setDeliveryNotes] = useState('Inspected containers. All trays delivered warm and in order.');
+  const [receiverName, setReceiverName] = useState(donation?.claimedByNgoName || '');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
   const [proofPhoto, setProofPhoto] = useState(
     'https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&q=80&w=800'
   );
   const [step, setStep] = useState<'details' | 'confirm_pickup' | 'complete_delivery'>('details');
+
+  React.useEffect(() => {
+    if (donation?.claimedByNgoName) {
+      setReceiverName(donation.claimedByNgoName);
+    }
+  }, [donation]);
 
   if (!isOpen || !donation) return null;
 
@@ -47,27 +53,32 @@ export const DeliveryWorkflowModal: React.FC<DeliveryWorkflowModalProps> = ({
 
   const pickupQuery = encodeURIComponent(`${donation.pickupAddress}, ${donation.city}`);
   const dropoffQuery = encodeURIComponent(
-    donation.claimedByNgoName ? `${donation.claimedByNgoName}, Metropolis` : 'Metropolis Community Kitchen'
+    donation.claimedByNgoName ? `${donation.claimedByNgoName}, ${donation.city}` : `${donation.city} Recipient Kitchen`
   );
   const googleMapsDirectionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupQuery}&destination=${dropoffQuery}`;
 
-  const handleAccept = () => {
-    acceptVolunteerTask(donation.id, {
-      id: currentUser?.id || 'vol-demo',
-      name: currentUser?.name || 'Alex Rivera (Volunteer)',
-      phone: currentUser?.phone || '+1 (555) 345-6789',
+  const handleAccept = async () => {
+    if (!currentUser) {
+      showToast('Login Required', 'Please sign in to accept delivery tasks.', 'warning');
+      return;
+    }
+    await acceptVolunteerTask(donation.id, {
+      id: currentUser.id,
+      name: currentUser.name,
+      phone: currentUser.phone,
     });
-  };
-
-  const handleMarkPickedUp = () => {
-    updateDeliveryStatus(donation.id, 'Picked Up');
     onClose();
   };
 
-  const handleMarkDelivered = () => {
-    updateDeliveryStatus(donation.id, 'Completed', {
+  const handleMarkPickedUp = async () => {
+    await updateDeliveryStatus(donation.id, 'Picked Up');
+    onClose();
+  };
+
+  const handleMarkDelivered = async () => {
+    await updateDeliveryStatus(donation.id, 'Completed', {
       proofPhoto,
-      receiverName,
+      receiverName: receiverName.trim() || donation.claimedByNgoName || 'Verified Pantry Manager',
       notes: deliveryNotes,
     });
     onClose();

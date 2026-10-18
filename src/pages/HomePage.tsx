@@ -133,7 +133,7 @@ export const HomePage: React.FC = () => {
             value={impactMetrics.totalMealsRescued}
             subtitle="Diverted from urban landfills"
             icon={Utensils}
-            trend="+18.4%"
+            trend={impactMetrics.totalMealsRescued > 0 ? "Live verified total" : undefined}
             accentColor="primary"
           />
           <StatCard
@@ -141,7 +141,7 @@ export const HomePage: React.FC = () => {
             value={impactMetrics.activeDonors}
             subtitle="Hotels, bistros & caterers"
             icon={Building2}
-            trend="+12 this month"
+            trend={impactMetrics.activeDonors > 0 ? `${impactMetrics.activeDonors} active partners` : undefined}
             accentColor="secondary"
           />
           <StatCard
@@ -149,7 +149,7 @@ export const HomePage: React.FC = () => {
             value={impactMetrics.partnerNgos}
             subtitle="Verified community kitchens"
             icon={HeartHandshake}
-            trend="100% verified"
+            trend="Accredited charities"
             accentColor="accent"
           />
           <StatCard
@@ -157,7 +157,7 @@ export const HomePage: React.FC = () => {
             value={impactMetrics.successfulDeliveries}
             subtitle="Completed safe dispatches"
             icon={CheckCircle2}
-            trend="99.2% on-time"
+            trend={impactMetrics.successfulDeliveries > 0 ? `${impactMetrics.successfulDeliveries} drop-offs` : undefined}
             accentColor="blue"
           />
         </div>

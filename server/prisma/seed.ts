@@ -85,9 +85,11 @@ async function main() {
 
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@foodrescue.org' },
-    update: {},
+    update: {
+      name: 'Alexandra Stone',
+    },
     create: {
-      name: 'Sarah Jenkins',
+      name: 'Alexandra Stone',
       email: 'admin@foodrescue.org',
       passwordHash,
       phone: '+1 (555) 999-0000',
