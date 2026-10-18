@@ -206,5 +206,16 @@ export const api = {
         body: JSON.stringify({ action, notes }),
       });
     },
+
+    issues: async () => {
+      return apiFetch<{ success: boolean; count: number; issues: any[] }>('/api/admin/issues');
+    },
+
+    resolveIssue: async (id: string, status: 'resolved' | 'dismissed') => {
+      return apiFetch<{ success: boolean; issue: any }>(`/api/admin/issues/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+    },
   },
 };

@@ -11,6 +11,7 @@ export const getAdminStats = async (_req: AuthenticatedRequest, res: Response): 
       donorsCount,
       ngosCount,
       volunteersCount,
+      totalUsers,
       donationsAgg,
     ] = await Promise.all([
       prisma.donation.count(),
@@ -19,6 +20,7 @@ export const getAdminStats = async (_req: AuthenticatedRequest, res: Response): 
       prisma.user.count({ where: { role: 'donor' } }),
       prisma.user.count({ where: { role: 'ngo' } }),
       prisma.user.count({ where: { role: 'volunteer' } }),
+      prisma.user.count(),
       prisma.donation.aggregate({
         _sum: {
           estimatedPeopleServed: true,
@@ -36,6 +38,7 @@ export const getAdminStats = async (_req: AuthenticatedRequest, res: Response): 
       success: true,
       stats: {
         totalMealsRescued,
+        totalUsers,
         activeDonors: donorsCount,
         partnerNgos: ngosCount,
         activeVolunteers: volunteersCount,
@@ -173,5 +176,49 @@ export const reviewVerificationRequest = async (req: AuthenticatedRequest, res: 
   } catch (error: any) {
     console.error('Review verification error:', error);
     res.status(500).json({ success: false, message: error.message || 'Error reviewing verification request.' });
+  }
+};
+
+export const getReportedIssues = async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const issues = await prisma.reportedIssue.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.status(200).json({ success: true, count: issues.length, issues });
+  } catch (error: any) {
+    console.error('Fetch issues error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error fetching reported issues.' });
+  }
+};
+
+export const resolveReportedIssue = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status = 'resolved' } = req.body;
+
+    const updated = await prisma.reportedIssue.update({
+      where: { id },
+      data: { status },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Issue marked as ${status}.`,
+      issue: updated,
+    });
+  } catch (error: any) {
+    console.error('Resolve issue error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error resolving issue.' });
   }
 };

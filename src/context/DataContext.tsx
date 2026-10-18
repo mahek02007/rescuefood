@@ -1,21 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   Donation,
   NotificationItem,
-  DonationStatus,
   LocationCoordinates
 } from '../types';
-import {
-  INITIAL_DONATIONS,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_VERIFICATION_REQUESTS,
-  INITIAL_REPORTED_ISSUES,
-  DEMO_USERS
-} from '../data/mockData';
 import { DEFAULT_USER_LOCATION } from '../utils/haversine';
 import { useToast } from './ToastContext';
 import confetti from 'canvas-confetti';
-import { api } from '../services/api';
+import { api, getStoredToken } from '../services/api';
 
 interface ImpactMetrics {
   totalMealsRescued: number;
@@ -26,81 +18,95 @@ interface ImpactMetrics {
   waterSavedLiters: number;
 }
 
+interface VerificationRequestItem {
+  id: string;
+  userId: string;
+  organizationName: string;
+  documentUrl?: string | null;
+  status: string;
+  submittedAt: string;
+  notes?: string | null;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    organization?: string | null;
+    city: string;
+    avatar?: string | null;
+  };
+}
+
+interface ReportedIssueItem {
+  id: string;
+  userId?: string | null;
+  donationId?: string | null;
+  issueType: string;
+  description: string;
+  status: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  } | null;
+}
+
 interface DataContextType {
   donations: Donation[];
   notifications: NotificationItem[];
-  verificationRequests: typeof INITIAL_VERIFICATION_REQUESTS;
-  reportedIssues: typeof INITIAL_REPORTED_ISSUES;
+  verificationRequests: VerificationRequestItem[];
+  reportedIssues: ReportedIssueItem[];
   userLocation: LocationCoordinates;
   searchRadius: number; // km
   impactMetrics: ImpactMetrics;
   unreadNotificationCount: number;
+  isLoading: boolean;
+  error: string | null;
 
   // Actions
+  refreshData: () => Promise<void>;
   setUserLocation: (loc: LocationCoordinates) => void;
   setSearchRadius: (radius: number) => void;
   detectCurrentLocation: () => Promise<{ success: boolean; message: string }>;
-  createDonation: (donation: Omit<Donation, 'id' | 'status' | 'createdAt'>) => string;
+  createDonation: (donation: Omit<Donation, 'id' | 'status' | 'createdAt'>) => Promise<string>;
   claimDonation: (
     donationId: string,
     ngoData: { id: string; name: string; quantity: number; peopleToServe: number; notes?: string }
-  ) => boolean;
+  ) => Promise<boolean>;
   acceptVolunteerTask: (
     donationId: string,
     volunteerData: { id: string; name: string; phone?: string }
-  ) => boolean;
+  ) => Promise<boolean>;
   updateDeliveryStatus: (
     donationId: string,
     status: 'Picked Up' | 'Completed',
     details?: { proofPhoto?: string; receiverName?: string; notes?: string }
-  ) => boolean;
-  cancelDonation: (donationId: string, reason: string, cancelledBy?: string) => boolean;
-  markNotificationAsRead: (id: string) => void;
-  markAllNotificationsAsRead: () => void;
+  ) => Promise<boolean>;
+  cancelDonation: (donationId: string, reason: string, cancelledBy?: string) => Promise<boolean>;
+  markNotificationAsRead: (id: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
   clearAllNotifications: () => void;
-  approveVerification: (id: string) => void;
-  rejectVerification: (id: string) => void;
-  resetDemoData: () => void;
+  approveVerification: (id: string) => Promise<void>;
+  rejectVerification: (id: string) => Promise<void>;
+  resolveIssue: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const STORAGE_DONATIONS_KEY = 'foodrescue_donations_v1';
-const STORAGE_NOTIF_KEY = 'foodrescue_notifs_v1';
-const STORAGE_VERIF_KEY = 'foodrescue_verif_v1';
 const STORAGE_LOCATION_KEY = 'foodrescue_loc_v1';
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast } = useToast();
 
-  const [donations, setDonations] = useState<Donation[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_DONATIONS_KEY);
-      return stored ? JSON.parse(stored) : INITIAL_DONATIONS;
-    } catch {
-      return INITIAL_DONATIONS;
-    }
-  });
-
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_NOTIF_KEY);
-      return stored ? JSON.parse(stored) : INITIAL_NOTIFICATIONS;
-    } catch {
-      return INITIAL_NOTIFICATIONS;
-    }
-  });
-
-  const [verificationRequests, setVerificationRequests] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_VERIF_KEY);
-      return stored ? JSON.parse(stored) : INITIAL_VERIFICATION_REQUESTS;
-    } catch {
-      return INITIAL_VERIFICATION_REQUESTS;
-    }
-  });
-
-  const [reportedIssues] = useState(INITIAL_REPORTED_ISSUES);
+  const [donations, setDonations] = useState<Donation[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [verificationRequests, setVerificationRequests] = useState<VerificationRequestItem[]>([]);
+  const [reportedIssues, setReportedIssues] = useState<ReportedIssueItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [userLocation, setUserLocationState] = useState<LocationCoordinates>(() => {
     try {
@@ -113,54 +119,55 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [searchRadius, setSearchRadius] = useState<number>(10);
 
-  // Sync with backend API if running
-  useEffect(() => {
-    const fetchBackendData = async () => {
-      try {
-        const [donationsRes, notifsRes] = await Promise.all([
-          api.donations.list(),
-          api.notifications.list(),
-        ]);
-        if (donationsRes.success && donationsRes.data?.donations && donationsRes.data.donations.length > 0) {
-          setDonations(donationsRes.data.donations);
-        }
-        if (notifsRes.success && notifsRes.data?.notifications && notifsRes.data.notifications.length > 0) {
-          setNotifications(notifsRes.data.notifications);
-        }
-      } catch {
-        // Fallback to local storage
+  // Fetch real database records from backend APIs
+  const refreshData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const token = getStoredToken();
+      const promises: Promise<any>[] = [api.donations.list()];
+
+      if (token) {
+        promises.push(api.notifications.list());
+        promises.push(api.admin.verifications().catch(() => ({ success: false })));
+        promises.push(api.admin.issues().catch(() => ({ success: false })));
       }
-    };
-    fetchBackendData();
+
+      const [donationsRes, notifsRes, verifsRes, issuesRes] = await Promise.all(promises);
+
+      if (donationsRes.success && donationsRes.data?.donations) {
+        setDonations(donationsRes.data.donations);
+      } else if (!donationsRes.success) {
+        setError(donationsRes.error || 'Failed to load donations from server.');
+      }
+
+      if (notifsRes?.success && notifsRes.data?.notifications) {
+        setNotifications(notifsRes.data.notifications);
+      }
+
+      if (verifsRes?.success && verifsRes.data?.requests) {
+        setVerificationRequests(verifsRes.data.requests);
+      }
+
+      if (issuesRes?.success && issuesRes.data?.issues) {
+        setReportedIssues(issuesRes.data.issues);
+      }
+    } catch (err: any) {
+      console.error('Data fetch error:', err);
+      setError(err.message || 'Unable to connect to FoodRescue API.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  // Sync to localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_DONATIONS_KEY, JSON.stringify(donations));
-  }, [donations]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(notifications));
-  }, [notifications]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_VERIF_KEY, JSON.stringify(verificationRequests));
-  }, [verificationRequests]);
+    refreshData();
+  }, [refreshData]);
 
   const setUserLocation = (loc: LocationCoordinates) => {
     setUserLocationState(loc);
     localStorage.setItem(STORAGE_LOCATION_KEY, JSON.stringify(loc));
     showToast('Location Updated', `Current search location set to ${loc.name || 'custom coordinates'}`, 'info');
-  };
-
-  const addNotification = (notif: Omit<NotificationItem, 'id' | 'timestamp' | 'read'>) => {
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      timestamp: 'Just now',
-      read: false,
-      ...notif,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
   };
 
   const detectCurrentLocation = async (): Promise<{ success: boolean; message: string }> => {
@@ -192,87 +199,44 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const createDonation = (donationData: Omit<Donation, 'id' | 'status' | 'createdAt'>): string => {
-    const id = `DON-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newDonation: Donation = {
-      ...donationData,
-      id,
-      status: 'Available',
-      createdAt: new Date().toISOString(),
-    };
+  const createDonation = async (donationData: Omit<Donation, 'id' | 'status' | 'createdAt'>): Promise<string> => {
+    const res = await api.donations.create(donationData);
+    if (!res.success || !res.data?.donation) {
+      showToast('Error Creating Donation', res.error || 'Server error occurred.', 'error');
+      throw new Error(res.error || 'Failed to create donation.');
+    }
 
-    setDonations((prev) => [newDonation, ...prev]);
-
-    // Persist to backend database if connected
-    api.donations.create(donationData).catch(() => {});
-
-    // Add alert notification
-    addNotification({
-      title: 'New Donation Posted',
-      message: `${newDonation.title} (${newDonation.quantityValue} ${newDonation.quantityUnit}) posted near ${newDonation.area}.`,
-      type: 'donation',
-      donationId: id,
-    });
+    const created = res.data.donation;
+    setDonations((prev) => [created, ...prev]);
 
     try {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
+      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
     } catch {
       // ignore
     }
 
     showToast(
       'Donation Posted Successfully!',
-      `Listing #${id} is now live and visible to nearby verified recipient NGOs.`,
+      `Listing #${created.id} is now live and stored in the database.`,
       'success'
     );
 
-    return id;
+    return created.id;
   };
 
-  const claimDonation = (
+  const claimDonation = async (
     donationId: string,
     ngoData: { id: string; name: string; quantity: number; peopleToServe: number; notes?: string }
-  ): boolean => {
-    let found = false;
-    setDonations((prev) =>
-      prev.map((don) => {
-        if (don.id === donationId && don.status === 'Available') {
-          found = true;
-          return {
-            ...don,
-            status: 'Claimed',
-            claimedByNgoId: ngoData.id,
-            claimedByNgoName: ngoData.name,
-            claimedAt: new Date().toISOString(),
-            ngoRequiredQuantity: ngoData.quantity,
-            ngoPeopleToServe: ngoData.peopleToServe,
-            ngoPickupNotes: ngoData.notes,
-          };
-        }
-        return don;
-      })
-    );
+  ): Promise<boolean> => {
+    const res = await api.donations.claim(donationId, {
+      quantity: ngoData.quantity,
+      peopleToServe: ngoData.peopleToServe,
+      notes: ngoData.notes,
+    });
 
-    if (found) {
-      // Sync with backend API
-      api.donations
-        .claim(donationId, {
-          quantity: ngoData.quantity,
-          peopleToServe: ngoData.peopleToServe,
-          notes: ngoData.notes,
-        })
-        .catch(() => {});
-
-      addNotification({
-        title: 'Donation Claimed!',
-        message: `${ngoData.name} claimed #${donationId}. Ready for volunteer pickup dispatch.`,
-        type: 'claim',
-        donationId,
-      });
+    if (res.success && res.data?.donation) {
+      const updated = res.data.donation;
+      setDonations((prev) => prev.map((d) => (d.id === donationId ? updated : d)));
 
       try {
         confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
@@ -285,89 +249,40 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       return true;
     }
+
+    showToast('Failed to Claim', res.error || 'Could not claim donation.', 'error');
     return false;
   };
 
-  const acceptVolunteerTask = (
+  const acceptVolunteerTask = async (
     donationId: string,
-    volunteerData: { id: string; name: string; phone?: string }
-  ): boolean => {
-    let found = false;
-    setDonations((prev) =>
-      prev.map((don) => {
-        if (don.id === donationId && (don.status === 'Claimed' || don.status === 'Available')) {
-          found = true;
-          return {
-            ...don,
-            status: 'Pickup Scheduled',
-            assignedVolunteerId: volunteerData.id,
-            assignedVolunteerName: volunteerData.name,
-            volunteerPhone: volunteerData.phone || '+1 (555) 345-6789',
-            acceptedAt: new Date().toISOString(),
-          };
-        }
-        return don;
-      })
-    );
-
-    if (found) {
-      api.donations.volunteerAccept(donationId).catch(() => {});
-
-      addNotification({
-        title: 'Volunteer Task Accepted',
-        message: `${volunteerData.name} has accepted pickup task for #${donationId}.`,
-        type: 'pickup',
-        donationId,
-      });
+    _volunteerData: { id: string; name: string; phone?: string }
+  ): Promise<boolean> => {
+    const res = await api.donations.volunteerAccept(donationId);
+    if (res.success && res.data?.donation) {
+      const updated = res.data.donation;
+      setDonations((prev) => prev.map((d) => (d.id === donationId ? updated : d)));
       showToast('Task Accepted', `Pickup scheduled for #${donationId}. Route is ready.`, 'success');
       return true;
     }
+
+    showToast('Task Error', res.error || 'Could not accept pickup task.', 'error');
     return false;
   };
 
-  const updateDeliveryStatus = (
+  const updateDeliveryStatus = async (
     donationId: string,
     status: 'Picked Up' | 'Completed',
     details?: { proofPhoto?: string; receiverName?: string; notes?: string }
-  ): boolean => {
-    let found = false;
-    setDonations((prev) =>
-      prev.map((don) => {
-        if (don.id === donationId) {
-          found = true;
-          const updated: Donation = { ...don, status };
-          if (status === 'Picked Up') {
-            updated.pickedUpAt = new Date().toISOString();
-          } else if (status === 'Completed') {
-            updated.deliveredAt = new Date().toISOString();
-            if (details?.proofPhoto) updated.deliveryProofPhoto = details.proofPhoto;
-            if (details?.receiverName) updated.receiverName = details.receiverName;
-            if (details?.notes) updated.deliveryNotes = details.notes;
-          }
-          return updated;
-        }
-        return don;
-      })
-    );
-
-    if (found) {
-      api.donations.updateDeliveryStatus(donationId, status, details).catch(() => {});
+  ): Promise<boolean> => {
+    const res = await api.donations.updateDeliveryStatus(donationId, status, details);
+    if (res.success && res.data?.donation) {
+      const updated = res.data.donation;
+      setDonations((prev) => prev.map((d) => (d.id === donationId ? updated : d)));
 
       if (status === 'Picked Up') {
-        addNotification({
-          title: 'Food Picked Up',
-          message: `Volunteer picked up #${donationId} and is en route to recipient kitchen.`,
-          type: 'pickup',
-          donationId,
-        });
         showToast('Food Picked Up', `Status updated: In transit to delivery address.`, 'info');
       } else if (status === 'Completed') {
-        addNotification({
-          title: 'Mission Complete: Food Delivered!',
-          message: `Donation #${donationId} was successfully delivered and verified by recipient.`,
-          type: 'delivery',
-          donationId,
-        });
         try {
           confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } });
         } catch {}
@@ -375,49 +290,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return true;
     }
+
+    showToast('Update Failed', res.error || 'Could not update delivery status.', 'error');
     return false;
   };
 
-  const cancelDonation = (donationId: string, reason: string, cancelledBy = 'User'): boolean => {
-    let found = false;
-    setDonations((prev) =>
-      prev.map((don) => {
-        if (don.id === donationId && don.status !== 'Completed') {
-          found = true;
-          return {
-            ...don,
-            status: 'Cancelled' as DonationStatus,
-            cancellationReason: reason,
-            cancelledAt: new Date().toISOString(),
-            cancelledBy,
-          };
-        }
-        return don;
-      })
-    );
-
-    if (found) {
-      api.donations.cancel(donationId, reason).catch(() => {});
-
-      addNotification({
-        title: 'Donation Cancelled',
-        message: `Donation #${donationId} was cancelled. Reason: ${reason}`,
-        type: 'cancellation',
-        donationId,
-      });
+  const cancelDonation = async (donationId: string, reason: string): Promise<boolean> => {
+    const res = await api.donations.cancel(donationId, reason);
+    if (res.success && res.data?.donation) {
+      const updated = res.data.donation;
+      setDonations((prev) => prev.map((d) => (d.id === donationId ? updated : d)));
       showToast('Donation Cancelled', `Listing #${donationId} marked as cancelled.`, 'warning');
       return true;
     }
+
+    showToast('Cancel Failed', res.error || 'Could not cancel donation.', 'error');
     return false;
   };
 
-  const markNotificationAsRead = (id: string) => {
-    api.notifications.markRead(id).catch(() => {});
+  const markNotificationAsRead = async (id: string) => {
+    await api.notifications.markRead(id).catch(() => {});
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
-  const markAllNotificationsAsRead = () => {
-    api.notifications.markAllRead().catch(() => {});
+  const markAllNotificationsAsRead = async () => {
+    await api.notifications.markAllRead().catch(() => {});
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     showToast('Notifications Marked', 'All notifications marked as read', 'info');
   };
@@ -427,45 +324,51 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('Notifications Cleared', 'Notification tray is now empty', 'info');
   };
 
-  const approveVerification = (id: string) => {
-    setVerificationRequests((prev: typeof INITIAL_VERIFICATION_REQUESTS) =>
-      prev.map((req) => (req.id === id ? { ...req, status: 'verified' } : req))
-    );
-    showToast('Verification Approved', `Entity #${id} has been granted verified credentials.`, 'success');
-  };
-
-  const rejectVerification = (id: string) => {
-    setVerificationRequests((prev: typeof INITIAL_VERIFICATION_REQUESTS) =>
-      prev.map((req) => (req.id === id ? { ...req, status: 'rejected' } : req))
-    );
-    showToast('Verification Rejected', `Entity #${id} verification was rejected.`, 'warning');
-  };
-
-  const resetDemoData = () => {
-    setDonations(INITIAL_DONATIONS);
-    setNotifications(INITIAL_NOTIFICATIONS);
-    setVerificationRequests(INITIAL_VERIFICATION_REQUESTS);
-    setUserLocationState(DEFAULT_USER_LOCATION);
-    localStorage.removeItem(STORAGE_DONATIONS_KEY);
-    localStorage.removeItem(STORAGE_NOTIF_KEY);
-    localStorage.removeItem(STORAGE_VERIF_KEY);
-    localStorage.removeItem(STORAGE_LOCATION_KEY);
-    showToast('Demo Data Reset', 'Platform state has been reset to default mock records.', 'info');
-  };
-
-  // Calculate platform impact metrics dynamically
-  const totalMealsRescued = donations.reduce((acc, d) => {
-    if (d.status === 'Completed' || d.status === 'Pickup Scheduled' || d.status === 'Picked Up' || d.status === 'Claimed') {
-      return acc + (d.estimatedPeopleServed || d.quantityValue);
+  const approveVerification = async (id: string) => {
+    const res = await api.admin.reviewVerification(id, 'approve');
+    if (res.success) {
+      setVerificationRequests((prev) =>
+        prev.map((req) => (req.id === id ? { ...req, status: 'verified' } : req))
+      );
+      showToast('Verification Approved', `Entity #${id} has been granted verified credentials.`, 'success');
+    } else {
+      showToast('Approval Failed', res.error || 'Server error', 'error');
     }
-    return acc;
-  }, 18450);
+  };
 
-  const completedCount = donations.filter((d) => d.status === 'Completed').length + 84;
-  const uniqueDonorsCount = new Set(donations.map((d) => d.donorId)).size + 36;
-  const uniqueNgosCount = 28;
-  const co2DivertedKg = Math.round(totalMealsRescued * 1.85);
-  const waterSavedLiters = Math.round(totalMealsRescued * 940);
+  const rejectVerification = async (id: string) => {
+    const res = await api.admin.reviewVerification(id, 'reject');
+    if (res.success) {
+      setVerificationRequests((prev) =>
+        prev.map((req) => (req.id === id ? { ...req, status: 'rejected' } : req))
+      );
+      showToast('Verification Rejected', `Entity #${id} verification was rejected.`, 'warning');
+    } else {
+      showToast('Rejection Failed', res.error || 'Server error', 'error');
+    }
+  };
+
+  const resolveIssue = async (id: string) => {
+    const res = await api.admin.resolveIssue(id, 'resolved');
+    if (res.success) {
+      setReportedIssues((prev) =>
+        prev.map((iss) => (iss.id === id ? { ...iss, status: 'resolved' } : iss))
+      );
+      showToast('Issue Resolved', 'Reported issue marked as resolved.', 'success');
+    }
+  };
+
+  // Platform impact metrics calculated purely from verified database records
+  const completedDonations = donations.filter((d) => d.status === 'Completed');
+  const totalMealsRescued = completedDonations.reduce((acc, d) => {
+    return acc + (d.estimatedPeopleServed || d.quantityValue || 0);
+  }, 0);
+
+  const completedCount = completedDonations.length;
+  const uniqueDonorsCount = new Set(donations.map((d) => d.donorId).filter(Boolean)).size;
+  const uniqueNgosCount = new Set(donations.map((d) => d.claimedByNgoId).filter(Boolean)).size;
+  const co2DivertedKg = Math.round(totalMealsRescued * 2.5);
+  const waterSavedLiters = Math.round(totalMealsRescued * 180);
 
   const impactMetrics: ImpactMetrics = {
     totalMealsRescued,
@@ -489,6 +392,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         searchRadius,
         impactMetrics,
         unreadNotificationCount,
+        isLoading,
+        error,
+        refreshData,
         setUserLocation,
         setSearchRadius,
         detectCurrentLocation,
@@ -502,7 +408,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearAllNotifications,
         approveVerification,
         rejectVerification,
-        resetDemoData,
+        resolveIssue,
       }}
     >
       {children}

@@ -18,7 +18,7 @@ if (process.env.NODE_ENV !== 'production') {
 export async function checkDatabaseConnection(): Promise<{ connected: boolean; message: string }> {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return { connected: true, message: 'PostgreSQL Database Connected Successfully' };
+    return { connected: true, message: 'Database Connected Successfully' };
   } catch (error: any) {
     return {
       connected: false,

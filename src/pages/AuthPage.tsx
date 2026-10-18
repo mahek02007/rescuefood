@@ -60,9 +60,8 @@ export const AuthPage: React.FC = () => {
       await login(loginEmail, loginPassword);
       showToast('Welcome back!', 'Successfully signed into FoodRescue.', 'success');
       navigate('/');
-    } catch {
-      showToast('Authentication Notice', 'Signing you in with current credentials.', 'info');
-      navigate('/');
+    } catch (err: any) {
+      showToast('Login Failed', err.message || 'Invalid email or password.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -96,9 +95,8 @@ export const AuthPage: React.FC = () => {
 
       showToast('Account Created!', `Welcome to FoodRescue. Your ${role} account is ready.`, 'success');
       navigate('/');
-    } catch {
-      showToast('Account Initialized', `Welcome to FoodRescue. Your ${role} account is ready.`, 'success');
-      navigate('/');
+    } catch (err: any) {
+      showToast('Registration Failed', err.message || 'Could not create account.', 'error');
     } finally {
       setIsSubmitting(false);
     }

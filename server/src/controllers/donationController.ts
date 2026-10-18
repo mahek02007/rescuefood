@@ -61,11 +61,11 @@ export const getDonations = async (req: Request, res: Response): Promise<void> =
     if (search) {
       const q = String(search).trim();
       where.OR = [
-        { title: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-        { city: { contains: q, mode: 'insensitive' } },
-        { area: { contains: q, mode: 'insensitive' } },
-        { pickupAddress: { contains: q, mode: 'insensitive' } },
+        { title: { contains: q } },
+        { description: { contains: q } },
+        { city: { contains: q } },
+        { area: { contains: q } },
+        { pickupAddress: { contains: q } },
       ];
     }
 
