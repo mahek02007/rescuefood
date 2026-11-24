@@ -92,7 +92,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error: any) {
     console.error('Registration error:', error);
-    res.status(500).json({ success: false, message: error.message || 'Server error during registration.' });
+    let message = error.message || 'Server error during registration.';
+    if (error.code === 'P1001') {
+      message = 'Database unreachable. Please check your DATABASE_URL environment variable.';
+    } else if (error.code === 'P2021') {
+      message = 'Database tables have not been created yet. Please run prisma db push.';
+    }
+    res.status(500).json({ success: false, message });
   }
 };
 
@@ -136,7 +142,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error: any) {
     console.error('Login error:', error);
-    res.status(500).json({ success: false, message: error.message || 'Server error during login.' });
+    let message = error.message || 'Server error during login.';
+    if (error.code === 'P1001') {
+      message = 'Database unreachable. Please check your DATABASE_URL environment variable.';
+    } else if (error.code === 'P2021') {
+      message = 'Database tables have not been created yet. Please run prisma db push.';
+    }
+    res.status(500).json({ success: false, message });
   }
 };
 
