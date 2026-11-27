@@ -35,8 +35,26 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health Check API
-app.get('/api/health', async (_req: Request, res: Response) => {
+// Root Endpoint
+app.get('/', (_req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    service: 'FoodRescue Backend API',
+    status: 'online',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      login: 'POST /api/auth/login',
+      register: 'POST /api/auth/register',
+      donations: 'GET /api/donations',
+      notifications: 'GET /api/notifications',
+      admin: 'GET /api/admin/stats',
+    },
+  });
+});
+
+// Health Check API (accessible via both /api/health and /health)
+app.get(['/api/health', '/health'], async (_req: Request, res: Response) => {
   const dbStatus = await checkDatabaseConnection();
   res.status(dbStatus.connected ? 200 : 503).json({
     status: dbStatus.connected ? 'healthy' : 'degraded',
@@ -46,11 +64,11 @@ app.get('/api/health', async (_req: Request, res: Response) => {
   });
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/donations', donationRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/admin', adminRoutes);
+// API Routes (accessible via both /api/* and root paths to prevent routing mismatch)
+app.use(['/api/auth', '/auth'], authRoutes);
+app.use(['/api/donations', '/donations'], donationRoutes);
+app.use(['/api/notifications', '/notifications'], notificationRoutes);
+app.use(['/api/admin', '/admin'], adminRoutes);
 
 // 404 Handler
 app.use((_req: Request, res: Response) => {
