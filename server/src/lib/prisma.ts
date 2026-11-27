@@ -15,10 +15,23 @@ if (!globalForPrisma.prisma) {
   globalForPrisma.prisma = prisma;
 }
 
-export async function checkDatabaseConnection(): Promise<{ connected: boolean; message: string }> {
+export async function checkDatabaseConnection(): Promise<{ connected: boolean; message: string; tables?: string[] }> {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return { connected: true, message: 'Database Connected Successfully' };
+    const rows: any = await prisma.$queryRaw`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name;
+    `;
+    const tables = Array.isArray(rows) ? rows.map((r: any) => r.table_name) : [];
+    return {
+      connected: true,
+      message: tables.length > 0 
+        ? `Database connected with ${tables.length} tables in public schema.` 
+        : 'Database connected, but no tables exist in public schema. Run prisma db push.',
+      tables,
+    };
   } catch (error: any) {
     return {
       connected: false,
